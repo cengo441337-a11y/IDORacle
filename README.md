@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="assets/idoracle-banner.jpg" alt="IDORacle: a sound, target-agnostic security oracle for detecting write-BOLA / IDOR vulnerabilities" width="860">
+
 # IDORacle
 
 ### Proof, not guesses, for access control bugs.
