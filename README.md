@@ -81,6 +81,30 @@ A committed state search, a grey box DB replica, and an OOB webhook all qualify.
 
 IDORacle is the deterministic validation oracle for [ARES](https://github.com/cengo441337-a11y/ares), the adaptive red team execution system. ARES discovers candidates, IDORacle turns each into a sound verdict plus a signed receipt and a coverage report. `idoracle/witness_tool.py` is a standalone, stdlib only ARES tool driven by a JSON recipe.
 
+## Beyond IDOR: the same primitive, generalized
+
+Under the IDOR skin, IDORacle is a **sound committed effect witness**: prove an action
+really changed state, without trusting the system's success response, and declare honestly
+what you cannot observe. That generalizes far past access control. `idoracle/agent_gate.py`
+applies it to AI agents: before an agent is allowed to say DONE, it plants a token in the
+write it is already making, re reads the target through a separate committed state path, and
+releases only on a durable observation. The tool's `200` / `exit 0` and the agent's "I did
+it" are the untrusted response, so the **silent no op**, the agent economy's most common
+failure, does not pass. The verdict is a portable signed receipt a downstream agent
+re derives LLM free (the A2A handoff).
+
+```bash
+python idoracle/agent_gate_demo.py
+# really commits        -> pass
+# returns ok, commits nothing -> fail   (the silent no-op, caught)
+# no committed-state view     -> hold   (provably_blind)
+```
+
+The same shape fits cross tenant isolation proofs, webhook and eventual consistency
+convergence, GDPR erasure tracing, and CI/CD config and policy propagation gates. It only
+fits where a plantable marker and a true committed state read both exist; everywhere else it
+says `provably_blind` rather than green.
+
 ## Honest scope and prior art
 
 The token injection plus view search **mechanism is prior art**: BACScan (Liu et al., CCS 2025, Distinguished Paper) injects high entropy tokens and confirms via dependent status pages. IDORacle claims **no new detection capability** over it. The contribution is narrow and stated plainly: the executable negative and sibling control suite that makes such an oracle false positive sound within a declared content only model, plus honest blind spot reporting and signed receipts. Soundness is model conditional (a black box can leak via timing or other side channels you cannot certify away). Pure black box completeness is information theoretically impossible, and IDORacle says so.
