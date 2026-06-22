@@ -8,7 +8,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-stdlib%20only-3776AB.svg)](#)
-[![Tests](https://img.shields.io/badge/tests-57%20passing-brightgreen.svg)](#)
+[![Tests](https://img.shields.io/badge/tests-63%20passing-brightgreen.svg)](#)
 [![Soundness](https://img.shields.io/badge/verdict-canary--witnessed-8A2BE2.svg)](#)
 
 A sound, target agnostic oracle that **proves** a write IDOR / BOLA is real, instead of guessing from HTTP status codes. It plants a unique high entropy canary, lets the attacker account write it, and confirms the change actually landed in committed state. It witnesses real bugs, and it refuses the false positives that wreck every status code scanner. When it cannot observe an object soundly, it says so, on the record, signed.
@@ -46,7 +46,7 @@ Both directions of soundness, on real code: it catches the real bug, and it does
 
 ```bash
 git clone https://github.com/cengo441337-a11y/IDORacle && cd IDORacle
-python -m unittest discover -s idoracle/tests -p "test_*.py"   # 57 tests, stdlib only
+python -m unittest discover -s idoracle/tests -p "test_*.py"   # 63 tests, stdlib only
 
 python idoracle/demo.py        # the canary soundness table
 python idoracle/obs_demo.py    # which observation views are SOUND to witness on
@@ -123,7 +123,7 @@ idoracle/
   pipeline.py      one audit bundle: validate + certify + honest report
   witness_tool.py  ARES native, recipe driven CLI
   target_app.py / obs_target.py / ext_target.py   deterministic lab targets
-  tests/           57 tests, stdlib unittest
+  tests/           63 tests, stdlib unittest
 recipes/           validation recipes (e.g. juiceshop-review-bola.json)
 docs/              the model conditional soundness write up
 ```

@@ -4,7 +4,7 @@ for unauthorized cross-principal writes, emitting a signed verified-autonomy rec
 Hardened against an adversarial soundness audit that broke v1. The baseline is now
 established from an AUTHORIZED A-side READ-BACK of the stored value (never the token
 the oracle sent, never the POST echo), and the probe is gated on create + read-back
-success — so server-side normalization, non-writable fields, plant failures, and
+success - so server-side normalization, non-writable fields, plant failures, and
 ambient object disappearance become honest HOLDs, not false witnesses.
 
 Protocol, per reference the tester can PLANT (create as principal A):

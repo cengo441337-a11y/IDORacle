@@ -23,7 +23,7 @@ The core idea is simple enough to state in three steps. Suppose principal B (the
 2. As B, perform the suspected unauthorized write.
 3. As A, re read the object through an authorized path. If the canary changed (or the object is gone), an unauthorized write provably happened.
 
-The verdict depends only on A's re read of committed state. It never looks at the status code B received. So the silent no op cannot fire it, and the denied but committed write cannot hide from it. The false positive probability is bounded by the collision probability of a 128 bit token, roughly `2^-128`.
+The verdict depends only on A's re read of committed state. It never looks at the status code B received. So the silent no op cannot fire it, and the denied but committed write cannot hide from it. The false positive probability is bounded by the collision probability of a 128 bit token, roughly `2^-128`. This holds under two preconditions the harness controls: the test tenant is quiescent during the probe, so no unrelated process rewrites the field, and B cannot read A's planted token through a separate path, so B can neither reproduce nor preserve it.
 
 When A cannot plant the object, or no committed state view reflects it, IDORacle does not guess. It returns `provably_blind` and asserts nothing. That honesty is not a weakness. It is the point.
 
