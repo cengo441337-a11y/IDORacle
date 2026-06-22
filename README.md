@@ -1,119 +1,107 @@
-# IDORacle 🕊️✨
+<div align="center">
 
-**The Sound Authorization Oracle for Write-BOLA & IDOR Validation**
+# IDORacle
 
-> **Sound by construction. Target-agnostic. Proven on real third-party vulnerable apps.**
-> Never guesses. Holds honestly when it can't confirm. Witnesses real bugs with canaries.
+### Proof, not guesses, for access control bugs.
 
-[![Tests](https://img.shields.io/badge/tests-57%2F57%20green)](https://github.com/cengo441337-a11y/IDORacle)
-[![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
-[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/python-stdlib%20only-3776AB.svg)](#)
+[![Tests](https://img.shields.io/badge/tests-57%20passing-brightgreen.svg)](#)
+[![Soundness](https://img.shields.io/badge/verdict-canary--witnessed-8A2BE2.svg)](#)
+
+A sound, target agnostic oracle that **proves** a write IDOR / BOLA is real, instead of guessing from HTTP status codes. It plants a unique high entropy canary, lets the attacker account write it, and confirms the change actually landed in committed state. It witnesses real bugs, and it refuses the false positives that wreck every status code scanner. When it cannot observe an object soundly, it says so, on the record, signed.
+
+</div>
 
 ---
 
-## The Core Idea
+## The problem
 
-Most API security tools **lie** on authorization bugs:
-- Status code 200/201 on cross-user write? → "BOLA found!" (false positive factory)
+Servers lie. A `200 OK` can be a silent no op. A `403 Forbidden` can hide a write that persisted. Almost every automated IDOR/BOLA scanner reads those responses and produces kilometre long false positive lists a human has to re triage.
 
-**IDORacle tells the truth**:
-It plants a **canary value** via the suspected write, then **observes the legitimate view** (as the owner) to see if the canary actually landed in the committed state.
+## What IDORacle does instead
 
-- Real effect → **WITNESS = true** + signed receipt (bug confirmed)
-- No effect (or auth fail) → **HOLD** or clean (sound, no false alarm)
+It does not read the response. It reads **committed state**.
 
-This is the **soundness property** that makes it trustworthy for real engagements and automation.
+1. As principal A, plant an object carrying a fresh 128 bit canary token.
+2. As principal B (the attacker), write that object.
+3. As principal A, re read it. If the canary changed, an unauthorized write **provably** happened, regardless of what status B received. False positive probability `<= 2^-128`.
 
-## Proven External Validity (Third-Party Apps)
+If A cannot plant the object, or no committed state view reflects it, IDORacle returns `provably_blind` and asserts nothing. Honest blindness beats a confident wrong answer.
 
-### 1. OWASP Juice Shop v20 (Docker) ✅
-- Real Write-IDOR: "edit another user's review"
-- User B overwrote User A's review with canary
-- Canary appeared in committed state via reviews view
-- Tool emitted: `witness=true, overall=fail, HMAC-signed receipt`
+## Proven on real, third party apps
 
-### 2. OWASP crAPI (latest, multi-service) ✅
-- Classic 200-confound on video rename endpoint
-- Attacker B's PUT on A's video ID returned HTTP 200
-- But actual name unchanged (canary proof: write hit B's own object)
-- Tool correctly: `witness=false` (sound negative, no false positive)
+Not a toy demo. Run live against software nobody on this project wrote:
 
-**This is the killer feature**: Catches real bugs *and* refuses to hallucinate on the exact class of false positives that break 99% of scanners.
+| Target | Finding | IDORacle verdict | A status code scanner would have |
+|---|---|---|---|
+| **OWASP Juice Shop** v20 | real write IDOR (edit another user's review) | `witness` -> signed `fail` | also flagged it (true positive) |
+| **OWASP crAPI** latest | cross user `PUT` returns **HTTP 200** but writes nothing | `no-bug` (sound) | screamed "BOLA!" (**false positive**) |
 
-## Key Features
+Both directions of soundness, on real code: it catches the real bug, and it does not invent the one that is not there.
 
-- **Target-Agnostic Refactor** (additive, 51 old tests green)
-  - Auth as callable (Bearer, Header, custom)
-  - `confirm_shared` flag for apps without sharing model
-  - `discover_writable_fields()` for unknown targets
-- **Canary Witness Engine**: Plant → Observe via view → Cryptographic proof
-- **Honest Audit Fusion (pipeline.py)**
-  - `run_audit(candidates)` → signed **AuditBundle**
-  - Verdict counts: 1 confirmed, 0 conditional, 2 clean, 1 held
-  - Coverage certificate (≥95% over plantable classes)
-  - Blind-spot honesty report ("4/6 classes provably_blind by construction")
-  - Two-numerator reporting + content-addressed receipts
-- **ARES-Native Tool**: Standalone `authz_witness.py` (stdlib, recipe-driven) drops straight into ARES `backend/tools/`
-- **Model-Conditional Soundness**: Not a theorem for all apps — proven proposition for the observable class via pilots
-
-## Quickstart (from source)
+## Quickstart
 
 ```bash
-git clone https://github.com/cengo441337-a11y/IDORacle.git
-cd IDORacle
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-python -m pytest tests/ -q   # 57/57 green
+git clone https://github.com/cengo441337-a11y/IDORacle && cd IDORacle
+python -m unittest discover -s idoracle/tests -p "test_*.py"   # 57 tests, stdlib only
+
+python idoracle/demo.py        # the canary soundness table
+python idoracle/obs_demo.py    # which observation views are SOUND to witness on
 ```
 
-## Architecture
+Validate one finding from a JSON recipe (the ARES native tool):
 
-```mermaid
-graph TD
-    Candidate[Candidate Finding] --> Oracle
-    Oracle --> Auth[Auth Callable + Field Discovery]
-    Auth --> Plant[Plant Canary via suspected Write]
-    Plant --> Observe[Observe via legitimate View as owner]
-    Observe --> Decide{Witness landed?}
-    Decide -->|Yes| Confirmed[WITNESS = true + Signed Receipt]
-    Decide -->|No| Hold[HOLD or Clean - Sound]
-    Confirmed --> Bundle[AuditBundle + Coverage + Blind Report]
+```bash
+python idoracle/witness_tool.py --recipe recipes/juiceshop-review-bola.json
+# -> signed verdict JSON: witness / no-bug / hold, content addressed + HMAC
 ```
 
-## ARES Integration & Fusion
+## How it stays sound: the qualifying view self test
 
-IDORacle fuses cleanly into ARES.
+A token search is only a heuristic until you prove the view you searched reflects committed state. IDORacle qualifies every observation channel before it trusts it:
 
-The standalone tool lives in `ares_integration/authz_witness.py`.
+- **O1** authorized: the tester can read the view.
+- **O2** commit gated: a token from a real path **non commit** must NOT appear (the negative control that excludes attempt and audit log false positives).
+- **O3** entropy preserving: a committed token survives verbatim (positive control).
+- **O4** unique causal path: a token injected through any other write path must NOT appear, and the view is not attacker writable.
+- **O5** durability: the token survives a fresh session past the settle window.
 
-**To update your ARES repo:**
-1. Copy `ares_integration/authz_witness.py` to `backend/tools/authz_witness.py`
-2. Register it in `backend/tools/native_tools.py` (match verify_proof.py style: argparse, json, sha256, HMAC)
-3. Recipe JSON in → signed verdict JSON out (witness, overall, receipt)
+A committed state search, a grey box DB replica, and an OOB webhook all qualify. An attempt derived audit log fails O2. An attacker writable feed fails O4. The same engine grades all of them.
 
-Now ARES can orchestrate sound authz validation natively.
+## Honest by design
 
-## Where this system brings massive value in IT
+- **Signed receipts.** Every verdict is a content addressed, HMAC signed receipt whose verdict is re derivable offline. A validly signed receipt with a wrong verdict is rejected.
+- **Two denominator coverage.** An anytime valid certificate reports residual mass of untested authorization classes beside the classes that are `provably_blind` by construction. Example output: `1 confirmed, 2 clean, 1 held; coverage >= 95% over 2/2 plantable classes; 4/6 declared classes provably_blind`.
+- **Policy aware.** A legitimately shared object that B may write fires the raw witness but is correctly **not** a bug.
 
-1. **CI/CD Pipelines** - Shift-left canary-witnessed authz tests on every PR for critical write endpoints.
-2. **Bug Bounty Platforms** - Auto-validate submissions with sound witness before triage. Less noise, faster real findings.
-3. **Red Team Orchestration** (ARES and similar) - Native sound validator + honest coverage reporting.
-4. **Compliance & Audit** - Generate signed bundles proving tested coverage and explicit blind spots for SOC2, ISO, GDPR.
-5. **API Gateways & Service Meshes** - Plugin for runtime validation in Kong, Istio, AWS API Gateway.
-6. **Developer Training & CTFs** - Realistic "did the fix work?" feedback via canary.
-7. **Continuous Attack Surface Management** - Scheduled honest audits with provable soundness.
-8. **Hybrid SAST/DAST** - Static candidate gen + sound dynamic witness validation.
+## ARES native
 
-## Honest Preprint Framing
+IDORacle is the deterministic validation oracle for [ARES](https://github.com/cengo441337-a11y/ares), the adaptive red team execution system. ARES discovers candidates, IDORacle turns each into a sound verdict plus a signed receipt and a coverage report. `idoracle/witness_tool.py` is a standalone, stdlib only ARES tool driven by a JSON recipe.
 
-See `docs/preprint-outline.md`. Red-team fixed: model-conditional, late-path negative control, O5 durability, pinned citations (BACScan CCS 2025, WSR 2024, etc.). No overclaims.
+## Honest scope and prior art
 
-## Status
-- 57/57 tests green (Linux + Windows)
-- External pilots passed on real third-party code (Juice Shop true positive, crAPI sound negative)
-- ARES tool ready
-- Public repo live
+The token injection plus view search **mechanism is prior art**: BACScan (Liu et al., CCS 2025, Distinguished Paper) injects high entropy tokens and confirms via dependent status pages. IDORacle claims **no new detection capability** over it. The contribution is narrow and stated plainly: the executable negative and sibling control suite that makes such an oracle false positive sound within a declared content only model, plus honest blind spot reporting and signed receipts. Soundness is model conditional (a black box can leak via timing or other side channels you cannot certify away). Pure black box completeness is information theoretically impossible, and IDORacle says so.
 
-MIT licensed. Obsessively honest about what we can prove.
+Lineage: honeytokens (Spitzner, "Honeytokens: The Other Honeypot", 2003), second order injection source to sink (Dahse and Holz, USENIX Security 2014), betting confidence sequences (Waudby-Smith and Ramdas, JRSS-B 86(1):1-27, 2024).
 
-**IDORacle** — Because guessing is not a security strategy.
+## Layout
+
+```
+idoracle/
+  oracle.py        canary write witness + signed receipt + verify_witness
+  views.py         the O1-O5 qualifying view self test
+  schema.py        authorization equivalence class DSL
+  coverage.py      classifier + policy aware verdict + ENVELOPE_NOTES
+  certificate.py   anytime valid coverage certificate (betting test martingale)
+  pipeline.py      one audit bundle: validate + certify + honest report
+  witness_tool.py  ARES native, recipe driven CLI
+  target_app.py / obs_target.py / ext_target.py   deterministic lab targets
+  tests/           57 tests, stdlib unittest
+recipes/           validation recipes (e.g. juiceshop-review-bola.json)
+docs/              the model conditional soundness write up
+```
+
+## License
+
+MIT. Authorized testing only.
