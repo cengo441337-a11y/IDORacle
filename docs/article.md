@@ -64,6 +64,14 @@ This is not a toy demonstration. IDORacle was run live against deliberately vuln
 
 Both directions of soundness, on real code: it catches the real bug, and it refuses the one that is not there.
 
+## From discovery to proof: the ARES combination
+
+Finding candidates and proving them are different jobs, and they want different tools. ARES (Adaptive Red-Team Execution System) is an authorization gated, multi agent red team orchestrator: it explores an application, reasons about which endpoints, principal pairs, and object references are worth attacking, and proposes candidate findings. That part is broad, creative, and heuristic, and like any language model driven system, it guesses.
+
+IDORacle is the deterministic validation oracle bolted to the other end. ARES hands each candidate to IDORacle as a small JSON recipe (how to authenticate, what to plant, where to write, where to observe). IDORacle runs the canary witness and returns a signed verdict: a proven bug, a sound clean, or an honest hold. The red team agent never has to be believed. Its findings arrive already validated, or already refuted, each with a receipt a human or a downstream agent can re check offline.
+
+The effect is a red team that does not drown you in maybes. ARES discovers at machine scale; IDORacle makes every claim sound or marks it `provably_blind`. The validator ships as a standalone, dependency free tool inside the ARES tools directory, and it keeps the same honesty about its own boundary as the rest of the system: a live run against a real external target is offensive work that requires a named, authorized scope.
+
 ## The bigger idea: a sound committed effect witness
 
 Strip away the IDOR skin and what remains is general. IDORacle is a way to prove that an action really changed state, without trusting the system's success response, and to declare honestly what you cannot observe. That pattern reaches far past access control.
